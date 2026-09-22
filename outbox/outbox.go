@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ajaka/nexus-shared/err"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
@@ -23,6 +24,10 @@ type Engine struct {
 
 // NewEngine initializes the shared outbox engine.
 func NewEngine(repo Repository, kafkaBrokers string, cfg Config, logger *slog.Logger) (*Engine, error) {
+
+	if err := validateConfig(&cfg); err != nil {
+		return nil, err
+	}
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": kafkaBrokers,
 		"acks":              "all",
@@ -39,6 +44,19 @@ func NewEngine(repo Repository, kafkaBrokers string, cfg Config, logger *slog.Lo
 		cfg:      cfg,
 		logger:   logger,
 	}, nil
+}
+
+func validateConfig(cfg *Config) error {
+	if cfg.PollInterval <= 0 {
+		return err.ErrInvalidPollDuration
+	}
+	if cfg.BatchSize <= 0 {
+		return err.ErrInvalidBatchSize
+	}
+	if cfg.Topic == "" {
+		return err.ErrKafkaTopicEmpty
+	}
+	return nil
 }
 
 // Start spawns the background worker loops.
